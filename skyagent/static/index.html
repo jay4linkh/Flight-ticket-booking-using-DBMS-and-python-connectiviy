@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyAgent</title>
+<style>
+:root {
+  --bg: #f5f6f8; --panel: #ffffff; --ink: #1b1f27; --muted: #667085; --line: #e3e6eb;
+  --accent: #2456d6; --accent-soft: #e8eefc; --ok: #13795b; --warn: #b54708; --bad: #c0362c;
+  --seat: #dfe7f7; --seat-biz: #f3e8d2; --seat-taken: #d5d8de; --mono: ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1218; --panel: #171b23; --ink: #e8ebf0; --muted: #98a2b3; --line: #2a303b;
+    --accent: #7aa2ff; --accent-soft: #1d2740; --seat: #24324f; --seat-biz: #4a3d22; --seat-taken: #2b2f37;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+header h1 { font-size: 17px; margin: 0; }
+header .sub { color: var(--muted); font-size: 13px; }
+nav { display: flex; gap: 4px; margin-left: auto; }
+nav button { background: none; border: 0; padding: 7px 12px; border-radius: 6px; color: var(--muted); cursor: pointer; font: inherit; }
+nav button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 16px; padding: 16px 20px; max-width: 1500px; margin: 0 auto; }
+@media (max-width: 1000px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.card h2 { font-size: 14px; margin: 0 0 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+input, select, textarea { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; }
+textarea { width: 100%; font-family: var(--mono); font-size: 13px; }
+button.primary { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+button.ghost { background: none; border: 1px solid var(--line); color: var(--ink); border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
+.muted { color: var(--muted); }
+.itin { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 10px 0; border-top: 1px solid var(--line); }
+.itin:first-child { border-top: 0; }
+.leg { font-size: 13px; }
+.fare { font-size: 18px; font-weight: 700; text-align: right; }
+.pill { display: inline-block; padding: 1px 7px; border-radius: 99px; font-size: 11px; background: var(--accent-soft); color: var(--accent); }
+.pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); }
+.seatmap { display: grid; gap: 3px; overflow-x: auto; padding-bottom: 6px; }
+.seatrow { display: flex; gap: 3px; align-items: center; }
+.seatrow .n { width: 24px; font-size: 11px; color: var(--muted); text-align: right; margin-right: 4px; }
+.seat { width: 26px; height: 24px; border-radius: 5px 5px 3px 3px; border: 0; font-size: 9px; cursor: pointer; background: var(--seat); color: var(--ink); }
+.seat.biz { background: var(--seat-biz); }
+.seat.taken { background: var(--seat-taken); cursor: not-allowed; color: transparent; }
+.seat.sel { outline: 2px solid var(--accent); }
+.gap { width: 12px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.stat { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.stat b { display: block; font-size: 20px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 500; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; max-height: 420px; }
+.bar { height: 6px; background: var(--accent-soft); border-radius: 3px; overflow: hidden; min-width: 80px; }
+.bar i { display: block; height: 100%; background: var(--accent); }
+#chat { position: sticky; top: 16px; display: flex; flex-direction: column; height: calc(100vh - 100px); min-height: 480px; }
+#log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+.msg { padding: 9px 12px; border-radius: 10px; white-space: pre-wrap; word-wrap: break-word; }
+.msg.user { background: var(--accent); color: #fff; align-self: flex-end; max-width: 85%; }
+.msg.bot { background: var(--bg); border: 1px solid var(--line); }
+.msg.err { color: var(--bad); }
+details.trace { font-size: 12px; color: var(--muted); }
+details.trace pre { font-family: var(--mono); white-space: pre-wrap; max-height: 160px; overflow: auto; background: var(--bg); padding: 6px; border-radius: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.chip { font-size: 12px; border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; cursor: pointer; background: none; color: var(--ink); }
+#chatform { display: flex; gap: 8px; margin-top: 10px; }
+#chatform input { flex: 1; }
+.hidden { display: none; }
+.toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>✈ SkyAgent</h1>
+  <span class="sub">Agentic reservation DBMS</span>
+  <nav>
+    <button data-tab="book" class="on">Book</button>
+    <button data-tab="ops">Operations</button>
+    <button data-tab="sql">SQL lab</button>
+  </nav>
+</header>
+
+<main>
+  <section>
+    <div id="tab-book">
+      <div class="card">
+        <h2>Search flights</h2>
+        <form id="search" class="row">
+          <label>From<input name="origin" value="Delhi" required size="12" list="ap"></label>
+          <label>To<input name="destination" value="Mumbai" required size="12" list="ap"></label>
+          <label>Date<input name="date" type="date" required></label>
+          <label>Cabin<select name="cabin"><option>ECONOMY</option><option>BUSINESS</option></select></label>
+          <label>± days<select name="flex_days"><option>0</option><option>1</option><option>2</option><option>3</option></select></label>
+          <button class="primary">Search</button>
+        </form>
+        <datalist id="ap"></datalist>
+      </div>
+      <div class="card hidden" id="results"><h2>Itineraries</h2><div id="itins"></div></div>
+      <div class="card hidden" id="seatcard">
+        <h2 id="seattitle">Choose a seat</h2>
+        <div class="muted" id="seatfares" style="margin-bottom:8px"></div>
+        <div class="seatmap" id="seatmap"></div>
+        <form id="holdform" class="row" style="margin-top:12px">
+          <label>Seat<input name="seat_no" size="5" placeholder="auto"></label>
+          <label>Full name<input name="full_name" required></label>
+          <label>Email<input name="email" type="email" required></label>
+          <button class="primary">Hold seat (15 min)</button>
+        </form>
+      </div>
+      <div class="card hidden" id="bookingcard"><h2>Booking</h2><div id="booking"></div></div>
+      <div class="card">
+        <h2>Manage a booking</h2>
+        <form id="lookup" class="row"><label>PNR<input name="pnr" size="8" required></label><button class="ghost">Look up</button></form>
+      </div>
+    </div>
+
+    <div id="tab-ops" class="hidden">
+      <div class="card"><h2>Network today</h2><div class="stats" id="stats"></div></div>
+      <div class="card"><h2>Route revenue ranking <span class="muted">(window function view)</span></h2><div class="tablewrap" id="routes"></div></div>
+      <div class="card"><h2>Fullest upcoming flights</h2><div class="tablewrap" id="hot"></div></div>
+      <div class="card"><h2>Audit trail <span class="muted">(written by triggers)</span></h2><div class="tablewrap" id="audit"></div></div>
+    </div>
+
+    <div id="tab-sql" class="hidden">
+      <div class="card">
+        <h2>Read-only SQL console</h2>
+        <p class="muted" style="margin-top:0">Same sandbox the agent uses: read-only file mode, write-denying authorizer, 3 s time limit.</p>
+        <textarea id="sqltext" rows="7">SELECT origin || '→' || destination AS route,
+       round(avg(sold * 100.0 / capacity), 1) AS avg_load_pct,
+       round(avg(dynamic_fare(base_fare, sold * 1.0 / capacity, julianday(departs_at) - julianday('now'), 'ECONOMY')), 2) AS avg_live_fare
+FROM v_flight_board
+GROUP BY route ORDER BY avg_load_pct DESC LIMIT 15</textarea>
+        <div class="row" style="margin-top:8px"><button class="primary" id="runsql">Run</button><span class="muted" id="sqlmeta"></span></div>
+      </div>
+      <div class="card"><div class="tablewrap" id="sqlout"><span class="muted">Results appear here.</span></div></div>
+    </div>
+  </section>
+
+  <aside class="card" id="chat">
+    <h2>Agent <span class="muted" id="model"></span></h2>
+    <div id="log">
+      <div class="msg bot">Hi! I can find flights, pick seats, hold and book tickets, handle cancellations, and answer questions about the data itself. What do you need?</div>
+    </div>
+    <div class="chips">
+      <button class="chip">Cheapest way from Bangalore to London next Friday</button>
+      <button class="chip">Window seat DEL→GOI in 3 days for Asha Rao, asha@example.com</button>
+      <button class="chip">Which routes are most at risk of selling out this week?</button>
+      <button class="chip">How much revenue did the agent book today?</button>
+    </div>
+    <form id="chatform"><input id="chatin" placeholder="Ask SkyAgent…" autocomplete="off"><button class="primary">Send</button></form>
+  </aside>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmtT = iso => iso ? iso.replace("T", " ").slice(5, 16) : "";
+const money = n => "$" + Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, {headers: {"Content-Type": "application/json"}, ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined});
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || r.statusText);
+  return data;
+}
+function toast(msg) {
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  document.body.append(t); setTimeout(() => t.remove(), 3500);
+}
+
+// Tabs
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x === b));
+  ["book", "ops", "sql"].forEach(t => $("#tab-" + t).classList.toggle("hidden", t !== b.dataset.tab));
+  if (b.dataset.tab === "ops") loadOps();
+});
+
+// Search
+const d = new Date(); d.setDate(d.getDate() + 3);
+$("#search").date.value = d.toISOString().slice(0, 10);
+let current = null;
+
+$("#search").origin.oninput = $("#search").destination.oninput = async e => {
+  if (e.target.value.length < 2) return;
+  const hits = await api("/api/airports?q=" + encodeURIComponent(e.target.value)).catch(() => []);
+  $("#ap").innerHTML = hits.map(h => `<option value="${h.iata}">${esc(h.city)} — ${esc(h.name)}</option>`).join("");
+};
+
+$("#search").onsubmit = async e => {
+  e.preventDefault();
+  const q = new URLSearchParams(new FormData(e.target));
+  try {
+    const its = await api("/api/flights?" + q);
+    $("#results").classList.remove("hidden");
+    $("#itins").innerHTML = its.length ? its.map((it, i) => `
+      <div class="itin">
+        <div>${it.legs.map(l => `<div class="leg"><b>${esc(l.flight_no)}</b> ${esc(l.origin)} ${fmtT(l.departs_at)} → ${esc(l.destination)} ${fmtT(l.arrives_at)}
+          <span class="muted">· ${esc(l.airline)} · ${esc(l.aircraft)} · ${l.seats_left} left</span>
+          <button class="ghost" data-f="${l.flight_id}" data-c="${q.get("cabin")}">Seats</button></div>`).join("")}
+          ${it.stops ? `<span class="pill warn">1 stop via ${esc(it.via)} · ${it.layover_minutes} min</span>` : `<span class="pill ok">Direct</span>`}
+        </div>
+        <div class="fare">${money(it.total_fare)}</div>
+      </div>`).join("") : `<span class="muted">No itineraries found. Try ± days.</span>`;
+    $("#itins").querySelectorAll("button[data-f]").forEach(b => b.onclick = () => openSeats(+b.dataset.f));
+  } catch (err) { toast(err.message); }
+};
+
+async function openSeats(fid) {
+  const m = await api(`/api/flights/${fid}/seats`);
+  current = fid;
+  $("#seatcard").classList.remove("hidden");
+  $("#seattitle").textContent = `${m.flight.flight_no} ${m.flight.origin}→${m.flight.destination} · ${fmtT(m.flight.departs_at)} UTC`;
+  $("#seatfares").textContent = `Live fares — Economy ${money(m.fares.ECONOMY)} · Business ${money(m.fares.BUSINESS)} · ${m.flight.sold}/${m.flight.capacity} sold`;
+  const rows = {};
+  m.seats.forEach(s => (rows[s.row_no] ??= []).push(s));
+  $("#seatmap").innerHTML = Object.entries(rows).map(([n, ss]) => {
+    const half = ss.length === 9 ? [3, 6] : [ss.length / 2];
+    return `<div class="seatrow"><span class="n">${n}</span>${ss.map((s, i) =>
+      (half.includes(i) ? '<span class="gap"></span>' : "") +
+      `<button class="seat ${s.cabin === "BUSINESS" ? "biz" : ""} ${s.available ? "" : "taken"}" data-s="${s.seat_no}" ${s.available ? "" : "disabled"}
+        title="${s.seat_no} ${s.cabin.toLowerCase()}${s.is_window ? " window" : ""}${s.is_aisle ? " aisle" : ""}">${s.letter}</button>`).join("")}</div>`;
+  }).join("");
+  $("#seatmap").querySelectorAll(".seat:not(.taken)").forEach(b => b.onclick = () => {
+    $("#seatmap").querySelectorAll(".sel").forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel"); $("#holdform").seat_no.value = b.dataset.s;
+  });
+  $("#seatcard").scrollIntoView({behavior: "smooth"});
+}
+
+$("#holdform").onsubmit = async e => {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  try {
+    const b = await api("/api/bookings/hold", {method: "POST", body: {flight_id: current, ...f,
+      seat_no: f.seat_no || null, cabin: $("#search").cabin.value}});
+    showBooking(b); openSeats(current);
+  } catch (err) { toast(err.message); }
+};
+
+function showBooking(b) {
+  $("#bookingcard").classList.remove("hidden");
+  const cls = {CONFIRMED: "ok", HELD: "warn", CANCELLED: "bad", EXPIRED: "bad"}[b.status];
+  $("#booking").innerHTML = `
+    <div style="font-size:22px;font-weight:700;font-family:var(--mono)">${esc(b.pnr)} <span class="pill ${cls}">${b.status}</span></div>
+    <p>${esc(b.full_name)} · ${esc(b.flight_no)} ${esc(b.origin)}→${esc(b.destination)} · ${fmtT(b.departs_at)} UTC · seat <b>${esc(b.seat_no)}</b> (${b.cabin.toLowerCase()}) · ${money(b.fare)}
+    ${b.hold_expires_at ? `<br><span class="muted">Hold expires ${fmtT(b.hold_expires_at)} UTC</span>` : ""}
+    ${b.refund_policy ? `<br><span class="muted">Refund ${money(b.refund)} — ${esc(b.refund_policy)}</span>` : ""}
+    <br><span class="muted">Loyalty points: ${b.loyalty_points}</span></p>
+    <div class="row">
+      ${b.status === "HELD" ? `<select id="pay"><option>CARD</option><option>UPI</option><option>WALLET</option></select><button class="primary" id="doconfirm">Pay ${money(b.fare)}</button>` : ""}
+      ${["HELD", "CONFIRMED"].includes(b.status) ? `<button class="ghost" id="docancel">Cancel</button>` : ""}
+    </div>`;
+  $("#doconfirm") && ($("#doconfirm").onclick = async () => {
+    try { showBooking(await api(`/api/bookings/${b.pnr}/confirm`, {method: "POST", body: {payment_method: $("#pay").value}})); }
+    catch (err) { toast(err.message); }
+  });
+  $("#docancel") && ($("#docancel").onclick = async () => {
+    if (!confirm("Cancel booking " + b.pnr + "?")) return;
+    try { showBooking(await api(`/api/bookings/${b.pnr}/cancel`, {method: "POST"})); } catch (err) { toast(err.message); }
+  });
+}
+
+$("#lookup").onsubmit = async e => {
+  e.preventDefault();
+  try { showBooking(await api("/api/bookings/" + encodeURIComponent(e.target.pnr.value.trim()))); }
+  catch (err) { toast(err.message); }
+};
+
+// Operations
+function table(rows, cols, num = []) {
+  if (!rows.length) return '<span class="muted">Nothing yet.</span>';
+  cols = cols || Object.keys(rows[0]);
+  return `<table><tr>${cols.map(c => `<th class="${num.includes(c) ? "num" : ""}">${esc(c)}</th>`).join("")}</tr>${rows.map(r =>
+    `<tr>${cols.map(c => `<td class="${num.includes(c) ? "num" : ""}">${esc(r[c])}</td>`).join("")}</tr>`).join("")}</table>`;
+}
+async function loadOps() {
+  const d = await api("/api/dashboard");
+  const t = d.totals;
+  $("#stats").innerHTML = [["Upcoming flights", t.upcoming_flights.toLocaleString()], ["Confirmed bookings", t.confirmed.toLocaleString()],
+    ["Active holds", t.held], ["Net revenue", money(t.net_revenue)], ["Average load", t.avg_load_pct + "%"]]
+    .map(([k, v]) => `<div class="stat"><span class="muted">${k}</span><b>${v}</b></div>`).join("");
+  $("#routes").innerHTML = table(d.top_routes.map(r => ({...r, revenue: money(r.revenue)})), null, ["flights", "confirmed_bookings", "revenue", "revenue_rank"]);
+  $("#hot").innerHTML = `<table><tr><th>Flight</th><th>Route</th><th>Departs (UTC)</th><th>Load</th><th class="num">Sold</th></tr>${d.hot_flights.map(f =>
+    `<tr><td>${esc(f.flight_no)}</td><td>${f.origin}→${f.destination}</td><td>${fmtT(f.departs_at)}</td>
+     <td><div class="bar"><i style="width:${f.load_pct}%"></i></div></td><td class="num">${f.sold}/${f.capacity}</td></tr>`).join("")}</table>`;
+  $("#audit").innerHTML = table(d.recent_activity, ["at", "actor", "op", "row_key", "old_row", "new_row"]);
+}
+
+// SQL lab
+$("#runsql").onclick = async () => {
+  const t0 = performance.now();
+  try {
+    const r = await api("/api/sql", {method: "POST", body: {sql: $("#sqltext").value}});
+    $("#sqlmeta").textContent = `${r.rows.length} rows${r.truncated ? " (truncated)" : ""} · ${Math.round(performance.now() - t0)} ms`;
+    $("#sqlout").innerHTML = table(r.rows.map(row => Object.fromEntries(r.columns.map((c, i) => [c, row[i]]))), r.columns);
+  } catch (err) { $("#sqlmeta").textContent = ""; $("#sqlout").innerHTML = `<span class="msg err">${esc(err.message)}</span>`; }
+};
+
+// Agent chat
+let sessionId = null;
+function addMsg(cls, html) {
+  const m = document.createElement("div"); m.className = "msg " + cls; m.innerHTML = html;
+  $("#log").append(m); $("#log").scrollTop = 1e9; return m;
+}
+async function send(text) {
+  if (!text.trim()) return;
+  addMsg("user", esc(text));
+  const pending = addMsg("bot muted", "Thinking…");
+  try {
+    const r = await api("/api/agent", {method: "POST", body: {message: text, session_id: sessionId}});
+    sessionId = r.session_id; $("#model").textContent = r.model;
+    const trace = r.trace.length ? `<details class="trace"><summary>${r.trace.length} database action${r.trace.length > 1 ? "s" : ""}: ${[...new Set(r.trace.map(t => t.tool))].join(", ")}</summary>${r.trace.map(t =>
+      `<pre>${t.error ? "⚠ " : ""}${esc(t.tool)}(${esc(JSON.stringify(t.input))})\n→ ${esc(t.output)}</pre>`).join("")}</details>` : "";
+    pending.className = "msg bot"; pending.innerHTML = esc(r.reply) + trace;
+    if (r.trace.some(t => ["hold_seat", "confirm_booking", "cancel_booking", "change_seat"].includes(t.tool) && !t.error)) {
+      const last = [...r.trace].reverse().find(t => t.output.startsWith("{") && t.output.includes('"pnr"'));
+      if (last) try { showBooking(JSON.parse(last.output)); } catch {}
+    }
+  } catch (err) { pending.className = "msg bot err"; pending.textContent = err.message; }
+}
+$("#chatform").onsubmit = e => { e.preventDefault(); const v = $("#chatin").value; $("#chatin").value = ""; send(v); };
+document.querySelectorAll(".chip").forEach(c => c.onclick = () => send(c.textContent));
+</script>
+</body>
+</html>
